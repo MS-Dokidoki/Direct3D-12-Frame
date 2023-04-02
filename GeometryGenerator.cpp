@@ -102,8 +102,8 @@ Mesh GeometryGenerator::CreateCylinder(float rBottom, float rTop, float height, 
     for(UINT i =  0; i < nSliceCount; ++i)
     {
         mesh.indices.push_back(nCentreIndex);
-        mesh.indices.push_back(nCentreIndex + i);
-        mesh.indices.push_back(nCentreIndex + i + 1);
+        mesh.indices.push_back(nBaseIndex + i);
+        mesh.indices.push_back(nBaseIndex + i + 1);
     }
 
     return mesh;
