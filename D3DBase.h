@@ -12,6 +12,7 @@
 #include <d3d12.h>
 #include <d3d12shader.h>
 #include <d3dcompiler.h>
+#include <DDSTextureLoader.h>
 
 #if defined(_DEBUG)
 #include <dxgidebug.h>

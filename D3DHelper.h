@@ -289,13 +289,14 @@ namespace D3DHelper
             float fDeltaTime;
 			DirectX::XMFLOAT4 vec4AmbientLight;
 			
-            Light::Light light[MAX_NUM_LIGHT];
+            Light::Light lights[MAX_NUM_LIGHT];
         };
 
         /// @brief 对象常量数据
         struct ObjectConstant
         {
             DirectX::XMFLOAT4X4 matWorld;
+            DirectX::XMFLOAT4X4 matTexTransform;
         };
 
         /// @brief 渲染项描述结构体
@@ -305,6 +306,7 @@ namespace D3DHelper
             // 它包含了对象的在世界空间中的朝向、位置和大小
             DirectX::XMFLOAT4X4 matWorld;
 
+            DirectX::XMFLOAT4X4 matTexTransform;
             // 使用脏标识(Dirty Flag)来表示物体相关数据已经发生变化
             // 由于每个帧资源都有一个常量缓冲区 所以我们必须对每一个帧资源中的数据进行更新
             // 当修改标识时，应当使该标识为当前程序的帧资源数量，即 iFrameDirty = 帧资源数量
@@ -329,6 +331,15 @@ namespace D3DHelper
             int nBaseVertexLocation;  // 顶点位置基值
         };
 		
+        struct Texture
+        {
+            Microsoft::WRL::ComPtr<ID3D12Resource> pResource;
+            Microsoft::WRL::ComPtr<ID3D12Resource> pUploader;
+
+            std::string Name;
+            std::wstring FileName;
+        };
+
         /// @brief 帧资源结构体
         struct FrameResource
         {
@@ -385,10 +396,12 @@ namespace D3DHelper
             Vertex() {}
             Vertex(float px, float py, float pz, float nx, float ny, float nz, float tx, float ty, float tz, float u, float v) : vec3Position(px, py, pz), vec3Normal(nx, ny, nz), vec3TangentU(tx, ty, tz), vec2TexCoords(u, v) {}
             Vertex(DirectX::XMFLOAT3 position, DirectX::XMFLOAT3 normal, DirectX::XMFLOAT3 tangentU, DirectX::XMFLOAT2 texCoords) : vec3Position(position), vec3Normal(normal), vec3TangentU(tangentU), vec2TexCoords(texCoords) {}
+    
             DirectX::XMFLOAT3 vec3Position;  // 顶点坐标
             DirectX::XMFLOAT3 vec3Normal;    // 顶点法线
             DirectX::XMFLOAT3 vec3TangentU;  // 切线向量
             DirectX::XMFLOAT2 vec2TexCoords; // 纹理坐标
+
         };
 
         /// @brief 几何体网格数据结构体。当前仅支持 UINT16 索引格式
@@ -425,9 +438,23 @@ namespace D3DHelper
             /// @param nVertGridCount 纵向栅格数量
             /// @return
             static Mesh CreateGrid(float fHorizonalLength, float fVerticalLength, UINT nHoriGridCount, UINT nVertGridCount);
+        
+            static Mesh CreateBox(float fWidth, float fHeight, float fDepth);
         };
     };
-	
+
+    namespace MathHelper
+    {
+        DirectX::XMFLOAT4X4 Identity4x4();
+        
+    };
+
+    namespace CONSTANT_VALUE
+    {
+        static const UINT nCBObjectByteSize = D3DHelper_CalcConstantBufferBytesSize(sizeof(Render::ObjectConstant));
+        static const UINT nCBSceneByteSize  = D3DHelper_CalcConstantBufferBytesSize(sizeof(Render::SceneConstant));
+        static const UINT nCBMaterialByteSize = D3DHelper_CalcConstantBufferBytesSize(sizeof(Light::MaterialConstant));
+    };
 };
 
 #endif

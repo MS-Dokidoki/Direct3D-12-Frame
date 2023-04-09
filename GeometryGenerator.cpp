@@ -3,6 +3,128 @@
 using namespace D3DHelper::Geometry;
 using namespace DirectX;
 
+Vertex Midpoint(const Vertex* v1, const Vertex* v2)
+{
+    XMVECTOR p1 = XMLoadFloat3(&v1->vec3Position);
+    XMVECTOR p2 = XMLoadFloat3(&v2->vec3Position);
+
+    XMVECTOR t1 = XMLoadFloat2(&v1->vec2TexCoords);
+    XMVECTOR t2 = XMLoadFloat2(&v2->vec2TexCoords);
+    
+    XMVECTOR ta1 = XMLoadFloat3(&v1->vec3TangentU);
+    XMVECTOR ta2 = XMLoadFloat3(&v2->vec3TangentU);
+
+    XMVECTOR n1 = XMLoadFloat3(&v1->vec3Normal);
+    XMVECTOR n2 = XMLoadFloat3(&v2->vec3Normal);
+
+    Vertex v;
+    XMStoreFloat3(&v.vec3Position,  0.5f * (p1 + p2));
+    XMStoreFloat3(&v.vec3TangentU,  XMVector3Normalize(0.5f * (ta1 + ta2)));
+    XMStoreFloat3(&v.vec3Normal, XMVector3Normalize(0.5f * (n1 + n2)));
+    XMStoreFloat2(&v.vec2TexCoords  ,0.5f * (t1 + t2));
+
+    return v;
+}
+
+void Subdivide(Mesh& mesh)
+{
+    Mesh copy = mesh;
+
+    mesh.indices.resize(0);
+    mesh.vertices.resize(0);
+
+    UINT num = copy.indices.size() / 3;
+    for(UINT i = 0; i < num; ++i)
+    {
+        Vertex v0 = copy.vertices[copy.indices[i * 3 + 0]];
+        Vertex v1 = copy.vertices[copy.indices[i * 3 + 1]];
+        Vertex v2 = copy.vertices[copy.indices[i * 3 + 2]];
+
+        Vertex m0 = Midpoint(&v0, &v1);
+        Vertex m1 = Midpoint(&v1, &v2);
+        Vertex m2 = Midpoint(&v0, &v2);
+
+        mesh.vertices.push_back(v0);
+        mesh.vertices.push_back(v1);
+        mesh.vertices.push_back(v2);
+        mesh.vertices.push_back(m0);
+        mesh.vertices.push_back(m1);
+        mesh.vertices.push_back(m2);
+        
+        mesh.indices.push_back(i*6+0);
+		mesh.indices.push_back(i*6+3);
+		mesh.indices.push_back(i*6+5);
+
+		mesh.indices.push_back(i*6+3);
+		mesh.indices.push_back(i*6+4);
+		mesh.indices.push_back(i*6+5);
+
+		mesh.indices.push_back(i*6+5);
+		mesh.indices.push_back(i*6+4);
+		mesh.indices.push_back(i*6+2);
+
+		mesh.indices.push_back(i*6+3);
+		mesh.indices.push_back(i*6+1);
+		mesh.indices.push_back(i*6+4);
+    }
+}
+Mesh GeometryGenerator::CreateBox(float width, float height, float depth)
+{
+    Mesh mesh;
+
+    Vertex v[24];
+
+	float w2 = 0.5f*width;
+	float h2 = 0.5f*height;
+	float d2 = 0.5f*depth;
+    
+	v[0] = Vertex(-w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[1] = Vertex(-w2, +h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[2] = Vertex(+w2, +h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[3] = Vertex(+w2, -h2, -d2, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+    v[4] = Vertex(-w2, -h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[5] = Vertex(+w2, -h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[6] = Vertex(+w2, +h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[7] = Vertex(-w2, +h2, +d2, 0.0f, 0.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[8]  = Vertex(-w2, +h2, -d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[9]  = Vertex(-w2, +h2, +d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[10] = Vertex(+w2, +h2, +d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[11] = Vertex(+w2, +h2, -d2, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[12] = Vertex(-w2, -h2, -d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+	v[13] = Vertex(+w2, -h2, -d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+	v[14] = Vertex(+w2, -h2, +d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	v[15] = Vertex(-w2, -h2, +d2, 0.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	v[16] = Vertex(-w2, -h2, +d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f);
+	v[17] = Vertex(-w2, +h2, +d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f);
+	v[18] = Vertex(-w2, +h2, -d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f);
+	v[19] = Vertex(-w2, -h2, -d2, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f);
+    v[20] = Vertex(+w2, -h2, -d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f);
+	v[21] = Vertex(+w2, +h2, -d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+	v[22] = Vertex(+w2, +h2, +d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f);
+	v[23] = Vertex(+w2, -h2, +d2, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+
+    mesh.vertices.assign(&v[0], &v[24]);
+
+    UINT16 i[36];
+
+	i[0] = 0; i[1] = 1; i[2] = 2;
+	i[3] = 0; i[4] = 2; i[5] = 3;
+	i[6] = 4; i[7]  = 5; i[8]  = 6;
+	i[9] = 4; i[10] = 6; i[11] = 7;
+	i[12] = 8; i[13] =  9; i[14] = 10;
+	i[15] = 8; i[16] = 10; i[17] = 11;
+	i[18] = 12; i[19] = 13; i[20] = 14;
+	i[21] = 12; i[22] = 14; i[23] = 15;
+	i[24] = 16; i[25] = 17; i[26] = 18;
+	i[27] = 16; i[28] = 18; i[29] = 19;
+	i[30] = 20; i[31] = 21; i[32] = 22;
+	i[33] = 20; i[34] = 22; i[35] = 23;
+    
+    mesh.indices.assign(&i[0], &i[36]);
+	
+    return mesh;
+}
+
 Mesh GeometryGenerator::CreateCylinder(float rBottom, float rTop, float height, UINT nSliceCount, UINT nStackCount)
 {
     Mesh mesh;
@@ -109,71 +231,73 @@ Mesh GeometryGenerator::CreateCylinder(float rBottom, float rTop, float height, 
     return mesh;
 }
 
-Mesh GeometryGenerator::CreateSphere(float radius, UINT nSliceCount, UINT nStackCount)
+Mesh GeometryGenerator::CreateSphere(float radius, UINT sliceCount, UINT stackCount)
 {
     Mesh mesh;
 
     Vertex top(0.0f, radius, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     Vertex bottom(0.0f, -radius, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
 
-    // 利用了三角函数的非线性原理
-    float fThetaStep = XM_2PI / nSliceCount;    // 顶点环每个顶点的平均角度步长
-    float fPhiStep = XM_PI / nStackCount;       // 顶点环与顶点环之间的平均角度步长
+    float phiStep = XM_PI / stackCount;
+    float thetaStep = 2.0f * XM_PI / sliceCount;
     
     mesh.vertices.push_back(top);
-    for(UINT i = 1; i < nStackCount - 1; ++i)
+    for(UINT i = 1; i <= stackCount - 1; ++i)
     {
-        float fPhi = i * fPhiStep;  
-        for(UINT j = 0; j < nSliceCount; ++j)
+        float phi = i * phiStep;
+        for(UINT j = 0; j <= sliceCount; ++j)
         {
-            float fTheta = j * fThetaStep;
-            Vertex vertex;
-            vertex.vec3Position = XMFLOAT3(radius * sinf(fPhi) * cosf(fTheta), radius * cosf(fPhi), radius * sinf(fPhi) * sinf(fTheta));
-            vertex.vec3TangentU = XMFLOAT3(-radius * sinf(fPhi) * sinf(fTheta), 0.0f, radius * sinf(fPhi) * cosf(fTheta));
-            vertex.vec2TexCoords = XMFLOAT2(fTheta / XM_2PI, fPhi / XM_PI);
+            float theta = j * thetaStep;
 
-            XMVECTOR T = XMLoadFloat3(&vertex.vec3TangentU);
-            XMVECTOR P = XMLoadFloat3(&vertex.vec3Position);
-            XMStoreFloat3(&vertex.vec3TangentU, XMVector3Normalize(T));
-            XMStoreFloat3(&vertex.vec3Normal, XMVector3Normalize(P));
+            Vertex v;
 
-            mesh.vertices.push_back(vertex);
+            v.vec3Position = XMFLOAT3(radius * sinf(phi) * cosf(theta), radius * cosf(phi), radius * sinf(phi) * sinf(theta));
+            v.vec3TangentU = XMFLOAT3(-radius * sinf(phi) * sinf(theta), 0.0f, radius * sinf(phi) * cosf(theta));
+            
+            XMVECTOR T = XMLoadFloat3(&v.vec3TangentU);
+            XMStoreFloat3(&v.vec3TangentU, XMVector3Normalize(T));
+            XMVECTOR P = XMLoadFloat3(&v.vec3Position);
+            XMStoreFloat3(&v.vec3Normal, XMVector3Normalize(P));
+
+            v.vec2TexCoords = XMFLOAT2(theta / XM_2PI, phi / XM_PI);
+            mesh.vertices.push_back(v);
         }
     }
     mesh.vertices.push_back(bottom);
-
+    
 /*******************************/
 // Indices
-    for(UINT i = 0; i <= nSliceCount; ++i)
+    
+    for(UINT i = 1; i <= sliceCount; ++i)
     {
         mesh.indices.push_back(0);
         mesh.indices.push_back(i + 1);
         mesh.indices.push_back(i);
     }
 
-    UINT nBaseIndex = 1;
-    UINT nRingVertexCount = nSliceCount + 1;
-    for(UINT i = 0; i < nStackCount - 2; ++i)
+    UINT baseIndex = 1;
+    UINT ringVertexCount = sliceCount + 1;
+    for(UINT i = 0; i < stackCount - 2; ++i)
     {
-        for(UINT j = 0; j < nSliceCount; ++j)
+        for(UINT j = 0; j < sliceCount; ++j)
         {
-            mesh.indices.push_back(nBaseIndex + i * nRingVertexCount + j);
-            mesh.indices.push_back(nBaseIndex + i * nRingVertexCount + j + 1);
-            mesh.indices.push_back(nBaseIndex + (i + 1) * nRingVertexCount + j);
-
-            mesh.indices.push_back(nBaseIndex + (i + 1) * nRingVertexCount + j);
-            mesh.indices.push_back(nBaseIndex + i * nRingVertexCount + j + 1);
-            mesh.indices.push_back(nBaseIndex + (i + 1) * nRingVertexCount + j + 1);
+            mesh.indices.push_back(baseIndex + i * ringVertexCount + j);
+            mesh.indices.push_back(baseIndex + i * ringVertexCount + j + 1);
+            mesh.indices.push_back(baseIndex + (i + 1) * ringVertexCount + j);
+            mesh.indices.push_back(baseIndex + (i + 1) * ringVertexCount + j);
+            mesh.indices.push_back(baseIndex + i * ringVertexCount + j + 1);
+            mesh.indices.push_back(baseIndex + (i + 1) * ringVertexCount + j + 1);
         }
     }
 
-    UINT southPoleIndex = mesh.vertices.size() - 1;
-    nBaseIndex = southPoleIndex - nRingVertexCount;
-    for(UINT i = 0; i < nSliceCount; ++i)
+    UINT southIndex = mesh.vertices.size() - 1;
+    baseIndex = southIndex - ringVertexCount;
+
+    for(UINT i = 0; i < sliceCount; ++i)
     {
-        mesh.indices.push_back(southPoleIndex);
-        mesh.indices.push_back(nBaseIndex + i);
-        mesh.indices.push_back(nBaseIndex + i + 1);
+        mesh.indices.push_back(southIndex);
+        mesh.indices.push_back(baseIndex + i);
+        mesh.indices.push_back(baseIndex + i + 1);
     }
 
     return mesh;

@@ -55,8 +55,11 @@ Microsoft::WRL::ComPtr<ID3DBlob> D3DHelper::CompileShader(LPCWSTR lpShaderFile, 
 
     ComPtr<ID3DBlob> pByteCode;
     ComPtr<ID3DBlob> pError;
-    ThrowIfFailedEx(D3DCompileFromFile(lpShaderFile, pDefines, D3D_COMPILE_STANDARD_FILE_INCLUDE, pEntryPoint, pTarget, uiCompileFlags, 0, &pByteCode, &pError), &pError);
+    HRESULT hr = D3DCompileFromFile(lpShaderFile, pDefines, D3D_COMPILE_STANDARD_FILE_INCLUDE, pEntryPoint, pTarget, uiCompileFlags, 0, &pByteCode, &pError);
 
+    if(pError)
+        OutputDebugStringA((char*)pError->GetBufferPointer());
+    ThrowIfFailedEx(hr, &pError);
     return pByteCode;
 }
 
