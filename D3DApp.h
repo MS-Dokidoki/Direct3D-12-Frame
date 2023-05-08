@@ -50,8 +50,8 @@ protected:
     D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilBufferView() const;
     
 protected:
-    HINSTANCE hInstance;        // 应用程序句柄
-    HWND hwnd;                  // 窗口句柄
+    HINSTANCE hInstance;
+    HWND hwnd;
     bool bAppPaused = 0;        
     bool bMinimized = 0;        
     bool bMaximized = 0;        
@@ -85,7 +85,7 @@ protected:
     D3D12_RECT ScissorRect;
     
     TCHAR szMainWndCaption[Def_WndCaptionMaxSize] = Def_WndCaption;
-    D3D_DRIVER_TYPE em_D3D_DriverType = Def_D3D_DriverType;
+    D3D_DRIVER_TYPE emD3DDriverType = Def_D3DDriverType;
     DXGI_FORMAT emBackBufferFormat = Def_BackBufferFormat;
     DXGI_FORMAT emDepthStencilFormat = Def_DepthStencilBufferFormat;
     int cxClient = Def_ClientWidth;
@@ -94,6 +94,6 @@ protected:
     bool bUseFrameResource;
     static const UINT nFrameResourceCount = Def_FrameResouceCount;
     UINT iCurrFrameResourceIndex = 0;
-    D3DHelper::Render::FrameResource pFrameResources[nFrameResourceCount];
-    D3DHelper::Render::FrameResource* pCurrFrameResource = NULL; 
+    D3DHelper::Resource::FrameResource pFrameResources[nFrameResourceCount];
+    D3DHelper::Resource::FrameResource* pCurrFrameResource = NULL; 
 };

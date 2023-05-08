@@ -4,7 +4,7 @@
 
 #define Def_WndCaptionMaxSize 32
 #define Def_WndCaption TEXT("D3D App")
-#define Def_D3D_DriverType D3D_DRIVER_TYPE_HARDWARE
+#define Def_D3DDriverType D3D_DRIVER_TYPE_HARDWARE
 #define Def_BackBufferFormat DXGI_FORMAT_R8G8B8A8_UNORM 
 #define Def_DepthStencilBufferFormat DXGI_FORMAT_D24_UNORM_S8_UINT
 #define Def_BufferMaxSize 128

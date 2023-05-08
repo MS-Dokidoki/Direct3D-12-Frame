@@ -55,6 +55,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include "GeometryGenerator.h"
 
 #define DXEXCEPTION_MAXSTRING 256
 #define DXEXCEPTION_MAXSTRINGEX 512
@@ -89,14 +90,12 @@ private:
 
 namespace D3DHelper
 {
-    /**** 通用部分 */
-
     /// @brief 编译 HLSL 着色器
     /// @param lpszShaderFile 磁盘中文件名称
     /// @param lpszDefines     宏定义字符串
     /// @param lpszEntryPoint  着色器入口点
     /// @param lpszTarget      着色器版本
-    /// @return             着色器二进制代码
+    /// @return                着色器二进制代码
     Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(LPCWSTR lpszShaderFile, const D3D_SHADER_MACRO *lpszDefines, const char *lpszEntryPoint, const char *lpszTarget);
 
     /// @brief 创建默认堆辅助函数
@@ -107,8 +106,16 @@ namespace D3DHelper
     /// @param pUploader    未初始化的上传堆
     /// @return             默认堆
     Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device *pDevice, ID3D12GraphicsCommandList *pComList, const void *pData, UINT nByteSize, ID3D12Resource **pUploader);
-
-    /// @brief 上传堆辅助类
+	
+	/// @brief 加载 DDS 纹理
+	/// @param pDevice 		D3D12 设备
+	/// @param pComList     命令列表
+	/// @param lpszFileName 磁盘文件名
+	/// @param pUploader    未初始化的上传堆
+	/// @return 			返回纹理资源
+    Microsoft::WRL::ComPtr<ID3D12Resource> LoadDDSFromFile(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pComList, LPCWSTR lpszFileName, ID3D12Resource** pUploader);
+    
+	/// @brief 上传堆辅助类
     class UploadBuffer
     {
     public:
@@ -128,17 +135,16 @@ namespace D3DHelper
         BYTE *pBufferBegin = NULL;
         UINT nElementByteSize;
     };
-
-    
+	
 	namespace Light
-    {
+	{
 		/// @brief 材质结构体
 		struct Material
 		{
 			std::string Name;						// 材质名
-			int nCBIndex;							// 本材质信息在常量缓冲区的索引
+			int nCBMaterialIndex;					// 本材质信息在常量缓冲区的索引
 			int nDiffuseSrvHeapIndex;				// 漫反射纹理在 SRV 堆中的索引
-			int iNumFramesDirty;					// 数据脏标识
+			int iFramesDirty;					    // 数据脏标识
 			
 			// 用于着色材质的常量缓冲区数据
 			DirectX::XMFLOAT4 vec4DiffuseAlbedo;	// 漫反射反照率
@@ -147,36 +153,7 @@ namespace D3DHelper
 			DirectX::XMFLOAT4X4 matTransform;
 		};
 		
-		/// @brief 材质常量数据
-		/*
-		cbuffer Material: register(b1)
-		{
-			float4 vec4DiffuseAlbedo;
-			float3 vec3FresnelR0;
-			float nRoughness;
-			float4x4 matTransform;
-		};
-		*/
-		struct MaterialConstant
-		{
-			DirectX::XMFLOAT4 vec4DiffuseAlbedo;	// 漫反射反照率
-			DirectX::XMFLOAT3 vec3FresnelR0;		// 材质属性R(0°)
-			float nRoughness;						// 表面粗糙度
-			DirectX::XMFLOAT4X4 matTransform;
-		};
-		
 		/// @brief 光源常量数据
-		/* HLSL(lighting.hlsl)
-		struct Light
-		{
-			float3 vec3Strength;
-			float nFalloffStart;
-			float3 vec3Direction;
-			float nFalloffEnd;
-			float3 vec3Position;
-			float nSpotPower;
-		};	
-		*/
 		struct Light
 		{
 			DirectX::XMFLOAT3 vec3Strength;			// 光源颜色
@@ -186,11 +163,66 @@ namespace D3DHelper
 			DirectX::XMFLOAT3 vec3Position;			// 光源位置(点光源/聚光灯光源)
 			float nSpotPower;						// 聚光灯因子
 		};
-    };
-    
-    /******* 渲染用部分*/
-    namespace Render
-    {
+	};
+	
+    namespace Constant
+	{
+		/// @brief 材质常量数据
+		struct MaterialConstant
+		{
+			DirectX::XMFLOAT4 vec4DiffuseAlbedo;	// 漫反射反照率
+			DirectX::XMFLOAT3 vec3FresnelR0;		// 材质属性R(0°)
+			float nRoughness;						// 表面粗糙度
+			DirectX::XMFLOAT4X4 matTransform;
+		};
+		
+		/// @brief 场景常量数据
+        struct SceneConstant
+        {
+            DirectX::XMFLOAT4X4 matView;
+            DirectX::XMFLOAT4X4 matInvView;
+            DirectX::XMFLOAT4X4 matProj;
+            DirectX::XMFLOAT4X4 matInvProj;
+            DirectX::XMFLOAT4X4 matViewProj;
+            DirectX::XMFLOAT4X4 matInvViewProj;
+            DirectX::XMFLOAT3 vec3EyePos;
+            float fPerObjectPad1;
+
+            DirectX::XMFLOAT2 vec2RenderTargetSize;
+            DirectX::XMFLOAT2 vec2InvRenderTargetSize;
+            float fNearZ;
+            float fFarZ;
+            float fTotalTime;
+            float fDeltaTime;
+			DirectX::XMFLOAT4 vec4AmbientLight;
+            DirectX::XMFLOAT4 vec4FogColor;
+            float fFogStart;
+            float fFogRange;
+            DirectX::XMFLOAT2 fPerScenePad2;
+
+            Light::Light lights[MAX_NUM_LIGHT];
+        };
+
+        /// @brief 对象常量数据
+        struct ObjectConstant
+        {
+            DirectX::XMFLOAT4X4 matWorld;
+            DirectX::XMFLOAT4X4 matTexTransform;
+        };
+
+	};
+	
+	namespace Resource
+	{
+		struct Texture
+        {
+            Microsoft::WRL::ComPtr<ID3D12Resource> pResource;
+            Microsoft::WRL::ComPtr<ID3D12Resource> pUploader;
+
+            std::string Name;
+            std::wstring FileName;
+        };
+		
         /// @brief 渲染数据描述结构体
         struct SubmeshGeometry
         {
@@ -250,96 +282,7 @@ namespace D3DHelper
                 pUploaderIndexBuffer = nullptr;
             }
         };
-
-        /// @brief 场景常量数据
-        /*  HLSL
-        cbuffer Scene: register(b2)
-        {
-            float4x4 matView;
-            float4x4 matInvView;
-            float4x4 matProj;
-            float4x4 matInvProj;
-            float4x4 matViewProj;
-            float4x4 matInvViewProj;
-            float3 vec3EyePos;
-            float fPerObjectPad1;
-            float2 vec2RenderTargetSize;
-            float2 vec2InvRenderTargetSize;
-            float fNearZ;
-            float fFarZ;
-            float fTotalTime;
-            float fDeltaTime;
-        };
-        */
-        struct SceneConstant
-        {
-            DirectX::XMFLOAT4X4 matView;
-            DirectX::XMFLOAT4X4 matInvView;
-            DirectX::XMFLOAT4X4 matProj;
-            DirectX::XMFLOAT4X4 matInvProj;
-            DirectX::XMFLOAT4X4 matViewProj;
-            DirectX::XMFLOAT4X4 matInvViewProj;
-            DirectX::XMFLOAT3 vec3EyePos;
-            float fPerObjectPad1;
-            DirectX::XMFLOAT2 vec2RenderTargetSize;
-            DirectX::XMFLOAT2 vec2InvRenderTargetSize;
-            float fNearZ;
-            float fFarZ;
-            float fTotalTime;
-            float fDeltaTime;
-			DirectX::XMFLOAT4 vec4AmbientLight;
-			
-            Light::Light lights[MAX_NUM_LIGHT];
-        };
-
-        /// @brief 对象常量数据
-        struct ObjectConstant
-        {
-            DirectX::XMFLOAT4X4 matWorld;
-            DirectX::XMFLOAT4X4 matTexTransform;
-        };
-
-        /// @brief 渲染项描述结构体
-        struct RenderItem
-        {
-            // 描述渲染对象局部空间相对于世界空间的矩阵
-            // 它包含了对象的在世界空间中的朝向、位置和大小
-            DirectX::XMFLOAT4X4 matWorld;
-
-            DirectX::XMFLOAT4X4 matTexTransform;
-            // 使用脏标识(Dirty Flag)来表示物体相关数据已经发生变化
-            // 由于每个帧资源都有一个常量缓冲区 所以我们必须对每一个帧资源中的数据进行更新
-            // 当修改标识时，应当使该标识为当前程序的帧资源数量，即 iFrameDirty = 帧资源数量
-            // 以确保每一个帧资源中的常量数据得到更新
-            int iFramesDirty;
-
-            // 该数据标识当前渲染项对应于帧资源的常量缓冲区索引
-            UINT nCBObjectIndex;
-
-            // 此渲染项绑定的几何体数据。一个几何体数据可以被多个渲染项绑定
-            MeshGeometry *pGeo;
-            
-            // 此渲染项绑定的材质数据。
-            Light::Material* pMaterial;
-
-            // 图元拓扑类型
-            D3D12_PRIMITIVE_TOPOLOGY emPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-
-            // 渲染用参数
-            UINT nIndexCount;         // 顶点索引的数量
-            UINT nStartIndexLocation; // 索引位置起始值
-            int nBaseVertexLocation;  // 顶点位置基值
-        };
 		
-        struct Texture
-        {
-            Microsoft::WRL::ComPtr<ID3D12Resource> pResource;
-            Microsoft::WRL::ComPtr<ID3D12Resource> pUploader;
-
-            std::string Name;
-            std::wstring FileName;
-        };
-
         /// @brief 帧资源结构体
         struct FrameResource
         {
@@ -363,8 +306,8 @@ namespace D3DHelper
             /// @param nObjectCount 对象常量数据块的数量
             void InitConstantBuffer(ID3D12Device *pDevice, UINT nSceneCount, UINT nObjectCount)
             {
-                CBScene.Init(pDevice, D3DHelper_CalcConstantBufferBytesSize(sizeof(SceneConstant)), nSceneCount);
-                CBObject.Init(pDevice, D3DHelper_CalcConstantBufferBytesSize(sizeof(ObjectConstant)), nObjectCount);
+                CBScene.Init(pDevice, D3DHelper_CalcConstantBufferBytesSize(sizeof(Constant::SceneConstant)), nSceneCount);
+                CBObject.Init(pDevice, D3DHelper_CalcConstantBufferBytesSize(sizeof(Constant::ObjectConstant)), nObjectCount);
             }
 			
 			/// @brief 初始化帧资源其它常量缓冲区
@@ -380,69 +323,14 @@ namespace D3DHelper
 					CBVertex.Init(pDevice, nByteSize, nCount);
 					break;
 				case CBTYPE_MATERIAL:
-					CBMaterial.Init(pDevice, D3DHelper_CalcConstantBufferBytesSize(sizeof(Light::MaterialConstant)), nCount);
+					CBMaterial.Init(pDevice, D3DHelper_CalcConstantBufferBytesSize(sizeof(Constant::MaterialConstant)), nCount);
 					break;
 				}
 			}
         };
-    };
-
-    /***** 几何体部分*/
-    namespace Geometry
-    {
-        /// @brief 几何体顶点数据结构体
-        struct Vertex
-        {
-            Vertex() {}
-            Vertex(float px, float py, float pz, float nx, float ny, float nz, float tx, float ty, float tz, float u, float v) : vec3Position(px, py, pz), vec3Normal(nx, ny, nz), vec3TangentU(tx, ty, tz), vec2TexCoords(u, v) {}
-            Vertex(DirectX::XMFLOAT3 position, DirectX::XMFLOAT3 normal, DirectX::XMFLOAT3 tangentU, DirectX::XMFLOAT2 texCoords) : vec3Position(position), vec3Normal(normal), vec3TangentU(tangentU), vec2TexCoords(texCoords) {}
-    
-            DirectX::XMFLOAT3 vec3Position;  // 顶点坐标
-            DirectX::XMFLOAT3 vec3Normal;    // 顶点法线
-            DirectX::XMFLOAT3 vec3TangentU;  // 切线向量
-            DirectX::XMFLOAT2 vec2TexCoords; // 纹理坐标
-
-        };
-
-        /// @brief 几何体网格数据结构体。当前仅支持 UINT16 索引格式
-        struct Mesh
-        {
-            std::vector<Vertex> vertices;
-            std::vector<UINT16> indices;
-        };
-
-        /// @brief 几何体网格生成静态类
-        class GeometryGenerator
-        {
-        public:
-            /// @brief 生成以局部坐标系原点为中心的柱体
-            /// @param bottomRadius 底面半径
-            /// @param topRadius    顶面半径
-            /// @param height       高度
-            /// @param nSliceCount  切片数量
-            /// @param nStackCount  堆叠数量
-            /// @return
-            static Mesh CreateCylinder(float bottomRadius, float topRadius, float height, UINT nSliceCount, UINT nStackCount);
-
-            /// @brief 生成以局部坐标系原点为中心的球体
-            /// @param radius       球体半径
-            /// @param nSliceCount  切片数量
-            /// @param nStackCount  堆叠数量
-            /// @return
-            static Mesh CreateSphere(float radius, UINT nSliceCount, UINT nStackCount);
-
-            /// @brief 生成以局部坐标系原点为中心的 x-z 栅格平面
-            /// @param fHorizonalLength 横向长度( x 轴方向)
-            /// @param fVerticalLength 纵向长度( z 轴方向)
-            /// @param nHoriGridCount 横向栅格数量
-            /// @param nVertGridCount 纵向栅格数量
-            /// @return
-            static Mesh CreateGrid(float fHorizonalLength, float fVerticalLength, UINT nHoriGridCount, UINT nVertGridCount);
-        
-            static Mesh CreateBox(float fWidth, float fHeight, float fDepth);
-        };
-    };
-
+		
+	};
+	
     namespace MathHelper
     {
         DirectX::XMFLOAT4X4 Identity4x4();
@@ -451,10 +339,47 @@ namespace D3DHelper
 
     namespace CONSTANT_VALUE
     {
-        static const UINT nCBObjectByteSize = D3DHelper_CalcConstantBufferBytesSize(sizeof(Render::ObjectConstant));
-        static const UINT nCBSceneByteSize  = D3DHelper_CalcConstantBufferBytesSize(sizeof(Render::SceneConstant));
-        static const UINT nCBMaterialByteSize = D3DHelper_CalcConstantBufferBytesSize(sizeof(Light::MaterialConstant));
+        static const UINT nCBObjectByteSize = D3DHelper_CalcConstantBufferBytesSize(sizeof(Constant::ObjectConstant));
+        static const UINT nCBSceneByteSize  = D3DHelper_CalcConstantBufferBytesSize(sizeof(Constant::SceneConstant));
+        static const UINT nCBMaterialByteSize = D3DHelper_CalcConstantBufferBytesSize(sizeof(Constant::MaterialConstant));
     };
 };
 
+namespace D3DHelper
+{
+	/// @brief 渲染项描述结构体
+	struct RenderItem
+	{
+		// 使用脏标识(Dirty Flag)来表示物体相关数据已经发生变化
+		// 由于每个帧资源都有一个常量缓冲区 所以我们必须对每一个帧资源中的数据进行更新
+		// 当修改标识时，应当使该标识为当前程序的帧资源数量，即 iFrameDirty = 帧资源数量
+		// 以确保每一个帧资源中的常量数据得到更新
+		int iFramesDirty;
+
+		// 描述渲染对象局部空间相对于世界空间的矩阵
+		// 它包含了对象的在世界空间中的朝向、位置和大小
+		DirectX::XMFLOAT4X4 matWorld;
+		
+		// 描述渲染对象的纹理坐标变换的矩阵
+		DirectX::XMFLOAT4X4 matTexTransform;
+		
+		// 该数据标识当前渲染项对应于帧资源的常量缓冲区索引
+		UINT nCBObjectIndex;
+
+		// 此渲染项绑定的几何体数据。一个几何体数据可以被多个渲染项绑定
+		Resource::MeshGeometry *pGeo;
+		
+		// 此渲染项绑定的材质数据。
+		Light::Material* pMaterial;
+
+		// 图元拓扑类型
+		D3D12_PRIMITIVE_TOPOLOGY emPrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+
+		// 渲染用参数
+		UINT nIndexCount;         // 顶点索引的数量
+		UINT nStartIndexLocation; // 索引位置起始值
+		int nBaseVertexLocation;  // 顶点位置基值
+	};
+			
+};
 #endif

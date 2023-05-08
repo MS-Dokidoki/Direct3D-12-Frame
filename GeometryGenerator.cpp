@@ -68,7 +68,7 @@ void Subdivide(Mesh& mesh)
 		mesh.indices.push_back(i*6+4);
     }
 }
-Mesh GeometryGenerator::CreateBox(float width, float height, float depth)
+Mesh GeometryGenerator::CreateCube(float width, float height, float depth)
 {
     Mesh mesh;
 

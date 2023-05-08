@@ -96,6 +96,33 @@ Microsoft::WRL::ComPtr<ID3D12Resource> D3DHelper::CreateDefaultBuffer(ID3D12Devi
     return pDefaultBuffer;
 }
 
+Microsoft::WRL::ComPtr<ID3D12Resource> D3DHelper::LoadDDSFromFile(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pComList, LPCWSTR lpszFileName, ID3D12Resource** pUploader)
+{
+    ComPtr<ID3D12Resource> pResource;
+    std::unique_ptr<UINT8[]> ddsData;
+    std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+    
+    ThrowIfFailed(DirectX::LoadDDSTextureFromFile(pDevice, lpszFileName, &pResource, ddsData, subresources));
+
+    UINT64 nBytesSize = GetRequiredIntermediateSize(pResource.Get(), 0, subresources.size());
+
+    ThrowIfFailed(pDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+        D3D12_HEAP_FLAG_NONE,
+        &CD3DX12_RESOURCE_DESC::Buffer(nBytesSize),
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        NULL, IID_PPV_ARGS(pUploader)
+    ));
+
+    UpdateSubresources(pComList, pResource.Get(), *pUploader, 0, 0, subresources.size(), &subresources[0]);
+
+    pComList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        pResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE
+    ));
+
+    return pResource;
+}
+
 UploadBuffer::UploadBuffer(){}
 
 UploadBuffer::UploadBuffer(ID3D12Device* pDevice, UINT nByteSize, UINT nCount)

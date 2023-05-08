@@ -1,5 +1,5 @@
 #include "D3DApp.h"
-#define USE_FRAMERESOURCE           // 默认开启帧资源
+#define USE_FRAMERESOURCE
 using namespace Microsoft::WRL;
 using namespace D3DHelper;
 
@@ -87,10 +87,6 @@ void D3DFrame::Render(const GameTimer& t)
     float clearColor[] = {0.1f, 0.1f, 0.1f, 1.0f};
     pCommandList->ClearRenderTargetView(CurrentBackBufferView(), clearColor, 0, NULL);
     pCommandList->ClearDepthStencilView(DepthStencilBufferView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, NULL);
-
-//
-
-//
 
     pCommandList->ResourceBarrier(
     1, &CD3DX12_RESOURCE_BARRIER::Transition(
